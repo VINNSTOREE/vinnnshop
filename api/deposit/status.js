@@ -1,7 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
-const dbPath = path.resolve('./qrisdb.json');
 const API_KEY = 'VS-0d726f7dc04a6b';
 
 module.exports = async (req, res) => {
@@ -13,8 +9,7 @@ module.exports = async (req, res) => {
       body += chunk;
     }
 
-    const data = JSON.parse(body);
-    const { api_key, reff_id } = data;
+    const { api_key, reff_id } = JSON.parse(body);
 
     if (!api_key || !reff_id) {
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
@@ -24,12 +19,7 @@ module.exports = async (req, res) => {
       return res.status(403).json({ result: false, message: 'API Key salah.' });
     }
 
-    // Baca database
-    let db = [];
-    if (fs.existsSync(dbPath)) {
-      db = JSON.parse(fs.readFileSync(dbPath));
-    }
-
+    const db = globalThis.qrisdb || [];
     const found = db.find(d => d.reff_id === reff_id);
     if (!found) {
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
