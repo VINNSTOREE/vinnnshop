@@ -1,32 +1,41 @@
-const { API_ID, API_KEY, DATABASE } = require('../../config');
+// api/deposit/status.js
 const fs = require('fs');
-const crypto = require('crypto');
+const path = require('path');
+
+const DATABASE = path.resolve(__dirname, '../../qrisdb.json');
+const API_KEY = 'VS-0d726f7dc04a6b';
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const body = req.body || {};
-  const querystring = require('querystring');
-  const buffers = [];
-  for await (const chunk of req) buffers.push(chunk);
-  const parsedBody = querystring.parse(Buffer.concat(buffers).toString());
+  try {
+    let body = '';
+    for await (const chunk of req) {
+      body += chunk;
+    }
 
-  const { api_key, sign, reff_id } = parsedBody;
+    const data = JSON.parse(body);
+    const { api_key, reff_id } = data;
 
-  if (!api_key || !sign || !reff_id) {
-    return res.json({ result: false, message: 'Parameter tidak lengkap.' });
+    if (!api_key || !reff_id) {
+      return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
+    }
+
+    if (api_key !== API_KEY) {
+      return res.status(403).json({ result: false, message: 'API Key salah.' });
+    }
+
+    if (!fs.existsSync(DATABASE)) fs.writeFileSync(DATABASE, '[]');
+    const depositList = JSON.parse(fs.readFileSync(DATABASE));
+
+    const found = depositList.find(d => d.reff_id === reff_id);
+    if (!found) {
+      return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
+    }
+
+    return res.json({ result: true, message: 'Deposit berhasil ditemukan.', data: found });
+
+  } catch (err) {
+    return res.status(500).json({ result: false, message: 'Server error', error: err.message });
   }
-
-  const validSign = crypto.createHash('md5').update(API_ID + API_KEY + reff_id).digest('hex');
-  if (api_key !== API_KEY || sign !== validSign) {
-    return res.json({ result: false, message: 'API Key atau Sign salah.' });
-  }
-
-  if (!fs.existsSync(DATABASE)) fs.writeFileSync(DATABASE, '[]');
-  const data = JSON.parse(fs.readFileSync(DATABASE));
-
-  const found = data.find(d => d.reff_id === reff_id);
-  if (!found) return res.json({ result: false, message: 'Deposit tidak ditemukan.' });
-
-  return res.json({ result: true, message: 'Deposit berhasil ditemukan.', data: found });
 };
