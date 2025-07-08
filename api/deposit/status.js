@@ -1,12 +1,11 @@
-// api/deposit/status.js
 const fs = require('fs');
 const path = require('path');
 
-const DATABASE = path.resolve(__dirname, '../../qrisdb.json');
+const dbPath = path.resolve('./qrisdb.json');
 const API_KEY = 'VS-0d726f7dc04a6b';
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ result: false, message: 'Method Not Allowed' });
 
   try {
     let body = '';
@@ -25,10 +24,13 @@ module.exports = async (req, res) => {
       return res.status(403).json({ result: false, message: 'API Key salah.' });
     }
 
-    if (!fs.existsSync(DATABASE)) fs.writeFileSync(DATABASE, '[]');
-    const depositList = JSON.parse(fs.readFileSync(DATABASE));
+    // Baca database
+    let db = [];
+    if (fs.existsSync(dbPath)) {
+      db = JSON.parse(fs.readFileSync(dbPath));
+    }
 
-    const found = depositList.find(d => d.reff_id === reff_id);
+    const found = db.find(d => d.reff_id === reff_id);
     if (!found) {
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
     }
