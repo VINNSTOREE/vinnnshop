@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://sxuqvxdxyqltcalnpdbz.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // GANTI dengan full API Key kamu
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4dXF2eGR4eXFsdGNhbG5wZGJ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjAwMzEwMywiZXhwIjoyMDY3NTc5MTAzfQ.m_Z-RYkRrMHtlcuQ8-ofDb8QxGalPtBA1tkY2jN8eyo'; // GANTI dengan full API Key kamu
 const API_KEY = 'VS-0d726f7dc04a6b'; // API key untuk otentikasi pengguna
 
 const supabase = createClient(supabaseUrl, supabaseKey);
