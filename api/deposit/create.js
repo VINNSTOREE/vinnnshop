@@ -2,12 +2,13 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // gunakan service role key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const API_KEY = process.env.API_KEY;
 
 const FIXED_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
+// qr string tetap
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST')
@@ -28,7 +29,6 @@ module.exports = async (req, res) => {
     const created = now.toISOString().replace('T', ' ').split('.')[0];
     const expired = new Date(now.getTime() + 30 * 60000).toISOString().replace('T', ' ').split('.')[0];
 
-    // Simpan ke Supabase
     const { data, error } = await supabase
       .from('deposits')
       .insert([{
