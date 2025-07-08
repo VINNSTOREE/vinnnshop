@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/deposit/*": {
+      "memory": 128,
+      "maxDuration": 10
+    }
+  }
+}
