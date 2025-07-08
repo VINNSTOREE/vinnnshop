@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dokumentasi API - VinnStore</title>
+  <style>
+    body { font-family: sans-serif; background: #121212; color: #fff; padding: 2rem; }
+    h1, h2 { color: #4caf50; }
+    code { background: #333; color: #0f0; padding: 2px 6px; border-radius: 4px; }
+    pre { background: #1e1e1e; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>📄 Dokumentasi API</h1>
+
+  <h2>🔧 Endpoint: <code>/api/deposit/create</code></h2>
+  <p>Method: <code>POST</code></p>
+  <p>Parameter:</p>
+  <ul>
+    <li><code>api_key</code>: API Key Anda</li>
+    <li><code>sign</code>: MD5(API_ID + API_KEY + REFF_ID)</li>
+    <li><code>nominal</code>: Jumlah deposit</li>
+    <li><code>user</code>: (opsional) Username</li>
+  </ul>
+
+  <h2>🔍 Endpoint: <code>/api/deposit/status</code></h2>
+  <p>Method: <code>POST</code></p>
+  <p>Parameter:</p>
+  <ul>
+    <li><code>api_key</code></li>
+    <li><code>sign</code></li>
+    <li><code>reff_id</code></li>
+  </ul>
+
+  <h2>📦 Contoh Fetch (JavaScript)</h2>
+  <pre><code>
+let sign = md5('c17eadffVS-0d726f7dc04a6bVS1234');
+let body = new URLSearchParams({
+  api_key: 'VS-0d726f7dc04a6b',
+  sign: sign,
+  nominal: 50000,
+  user: 'vinsensei'
+});
+
+fetch('https://vinn-api.vercel.app/api/deposit/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: body
+})
+.then(res => res.json())
+.then(console.log);
+  </code></pre>
+</body>
+</html>
