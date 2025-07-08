@@ -7,7 +7,7 @@ const API_KEY = process.env.API_KEY || 'VS-0d726f7dc04a6b'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') 
+  if (req.method !== 'POST')
     return res.status(405).json({ result: false, message: 'Method Not Allowed' })
 
   const { api_key, reff_id } = req.body
