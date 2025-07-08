@@ -1,30 +1,25 @@
 const { API_ID, API_KEY, DATABASE } = require('../../config');
 const fs = require('fs');
-const crypto = require('crypto');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-  const body = req.body || {}; // if using Vercel edge functions
   const querystring = require('querystring');
-
   const buffers = [];
   for await (const chunk of req) buffers.push(chunk);
   const parsedBody = querystring.parse(Buffer.concat(buffers).toString());
 
-  const { api_key, sign, nominal, reff_id, user } = parsedBody;
+  const { api_key, nominal, reff_id, user } = parsedBody;
 
-  // Validasi
-  if (!api_key || !sign || !nominal || !reff_id) {
+  if (!api_key || !nominal || !reff_id) {
     return res.json({ result: false, message: 'Parameter tidak lengkap.' });
   }
 
-  const validSign = crypto.createHash('md5').update(API_ID + API_KEY + reff_id).digest('hex');
-
-  if (api_key !== API_KEY || sign !== validSign) {
-    return res.json({ result: false, message: 'API Key atau Sign salah.' });
+  if (api_key !== API_KEY) {
+    return res.json({ result: false, message: 'API Key salah.' });
   }
 
+  // lanjut proses seperti biasa
   const fee = 597;
   const total = parseInt(nominal) + fee;
   const now = new Date();
