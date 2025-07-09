@@ -4,21 +4,23 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const FormData = require('form-data');
 
+// API key
 const API_KEY = 'VS-0d726f7dc04a6b';
 
+// Schema MongoDB
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
   fee: Number,
   total_bayar: Number,
   status: String,
-  qr_string: String,
-  qr_base64: String,
+  qr_string: String, // URL gambar QR code
   date_created: Date,
   date_expired: Date
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
+// QRIS CRC-16
 function convertCRC16(str) {
   let crc = 0xFFFF;
   for (let c = 0; c < str.length; c++) {
@@ -30,6 +32,7 @@ function convertCRC16(str) {
   return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
+// QRIS string dinamis
 function generateQRISString(baseQRIS, nominal) {
   let qrisData = baseQRIS.slice(0, -4);
   const step1 = qrisData.replace("010211", "010212");
@@ -43,35 +46,39 @@ function generateQRISString(baseQRIS, nominal) {
   return result;
 }
 
-async function uploadQRToPixhost(buffer) {
+// Upload QR buffer ke catbox.moe
+async function uploadQRToCatbox(buffer) {
   const form = new FormData();
-  form.append('img', buffer, {
+  form.append('reqtype', 'fileupload');
+  form.append('fileToUpload', buffer, {
     filename: 'qris.png',
     contentType: 'image/png'
   });
-  form.append('content_type', '1');
-  form.append('action', 'upload');
+  // Kalau punya userhash, tambahkan ini:
+  // form.append('userhash', 'YOUR_USER_HASH_HERE');
 
-  const response = await axios.post('https://pixhost.to/upload-api.php', form, {
+  const response = await axios.post('https://catbox.moe/user/api.php', form, {
     headers: form.getHeaders()
   });
 
-  const match = response.data.match(/https:\/\/img\d+\.pixhost\.to\/images\/\d+\/[^"]+/);
-  if (!match) throw new Error('Gagal parsing link gambar.');
+  if (!response.data.startsWith('https://')) {
+    throw new Error('Upload gagal: ' + response.data);
+  }
 
-  return match[0];
+  return response.data; // URL file uploaded
 }
 
+// Handler utama
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') 
+  if (req.method !== 'POST')
     return res.status(405).json({ result: false, message: 'Method Not Allowed' });
 
   try {
     const { api_key, nominal, reff_id } = req.body;
-    if (!api_key || !nominal) 
+    if (!api_key || !nominal)
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
 
-    if (api_key !== API_KEY) 
+    if (api_key !== API_KEY)
       return res.status(403).json({ result: false, message: 'API Key salah.' });
 
     await connectDB();
@@ -85,17 +92,11 @@ module.exports = async (req, res) => {
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
 
-    const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
+    const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A0163040DB5';
 
-    // Generate QRIS string dan buffer
     const qrString = generateQRISString(BASE_QRIS, nominal);
     const qrBuffer = await QRCode.toBuffer(qrString);
-
-    // Upload QR ke Pixhost
-    const qrUrl = await uploadQRToPixhost(qrBuffer);
-
-    // Generate QR Base64 untuk response langsung tanpa perlu convert lagi client-side
-    const qrBase64 = await QRCode.toDataURL(qrString);
+    const qrUrl = await uploadQRToCatbox(qrBuffer);
 
     const deposit = new Deposit({
       reff_id: idTransaksi,
@@ -104,7 +105,6 @@ module.exports = async (req, res) => {
       total_bayar: total,
       status: 'Pending',
       qr_string: qrUrl,
-      qr_base64: qrBase64,
       date_created: now,
       date_expired: expired
     });
