@@ -14,7 +14,8 @@ const DepositSchema = new mongoose.Schema({
   fee: Number,
   total_bayar: Number,
   status: String,
-  qr_string: String, // URL gambar QR code
+  qr_string: String,      // URL gambar QR code
+  qr_base64: String,      // optional, base64 QR code image
   date_created: Date,
   date_expired: Date
 });
@@ -66,6 +67,18 @@ async function uploadQRToPixhost(buffer) {
   return match[0];
 }
 
+// Generate QR code base64 tanpa upload
+async function generateQRBase64(qrString) {
+  try {
+    const base64Data = await QRCode.toDataURL(qrString);
+    // base64Data format: data:image/png;base64,xxxxxx
+    return base64Data;
+  } catch (error) {
+    console.error('Error generating QR base64:', error);
+    throw error;
+  }
+}
+
 // Handler utama
 module.exports = async (req, res) => {
   if (req.method !== 'POST')
@@ -93,8 +106,18 @@ module.exports = async (req, res) => {
     const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
 
     const qrString = generateQRISString(BASE_QRIS, nominal);
+
+    // Generate QR buffer and upload to pixhost
     const qrBuffer = await QRCode.toBuffer(qrString);
-    const qrUrl = await uploadQRToPixhost(qrBuffer);
+    let qrUrl = null;
+    try {
+      qrUrl = await uploadQRToPixhost(qrBuffer);
+    } catch (e) {
+      console.warn('Upload QR ke pixhost gagal, lanjut tanpa upload:', e.message);
+    }
+
+    // Generate base64 sebagai fallback atau tambahan
+    const qrBase64 = await generateQRBase64(qrString);
 
     const deposit = new Deposit({
       reff_id: idTransaksi,
@@ -102,7 +125,8 @@ module.exports = async (req, res) => {
       fee,
       total_bayar: total,
       status: 'Pending',
-      qr_string: qrUrl,
+      qr_string: qrUrl || '',   // kalau upload gagal, kosongkan
+      qr_base64: qrBase64,      // selalu simpan base64
       date_created: now,
       date_expired: expired
     });
