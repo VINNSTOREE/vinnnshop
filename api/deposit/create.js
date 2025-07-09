@@ -1,7 +1,10 @@
 const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
 
-// Pastikan schema dibuat setelah koneksi
+const API_KEY = 'VS-0d726f7dc04a6b';
+const FIXED_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
+
+// Definisi schema deposit
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -14,11 +17,10 @@ const DepositSchema = new mongoose.Schema({
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-const API_KEY = 'VS-0d726f7dc04a6b';
-const FIXED_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
-
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).json({ result: false, message: 'Method Not Allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ result: false, message: 'Method Not Allowed' });
+  }
 
   try {
     const { api_key, nominal, reff_id } = req.body;
@@ -33,17 +35,19 @@ module.exports = async (req, res) => {
 
     await connectDB(); // koneksi MongoDB
 
-    const idTransaksi = reff_id || 'VS' + Math.floor(Math.random() * 1000000);
+    const idTransaksi = reff_id || 'VS' + Math.floor(100000 + Math.random() * 900000); // random 6 digit
     const fee = 597;
     const total = parseInt(nominal) + fee;
     const now = new Date();
-    const expired = new Date(now.getTime() + 30 * 60000);
+    const expired = new Date(now.getTime() + 30 * 60000); // 30 menit
 
+    // Cek jika reff_id sudah ada
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) {
       return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
     }
 
+    // Simpan ke MongoDB
     const deposit = new Deposit({
       reff_id: idTransaksi,
       nominal: parseInt(nominal),
@@ -62,6 +66,7 @@ module.exports = async (req, res) => {
       message: 'Deposit berhasil dibuat.',
       data: deposit
     });
+
   } catch (err) {
     console.error('❌ Server error:', err);
     return res.status(500).json({ result: false, message: 'Server error', error: err.message });
