@@ -1,21 +1,23 @@
-// src/utils/mongodb.js
 const mongoose = require('mongoose');
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Vinndb:Hanzo1211k@cluster0.tdahyqf.mongodb.net/vinnstore?retryWrites=true&w=majority';
 
 let isConnected = false;
 
 const connectDB = async () => {
   if (isConnected) return;
+
   try {
-    await mongoose.connect(MONGODB_URI, {
+    const uri = 'mongodb+srv://vinnaja619:bID81oPBSTmXtLu4@cluster0.8jy4aze.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+
+    const conn = await mongoose.connect(uri, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
+      dbName: 'qrisdb' // Ganti nama DB kalau perlu
     });
-    isConnected = true;
-    console.log("✅ MongoDB connected");
+
+    isConnected = conn.connections[0].readyState;
+    console.log('✅ MongoDB connected:', conn.connection.host);
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error('❌ MongoDB connection error:', err.message);
     throw err;
   }
 };
