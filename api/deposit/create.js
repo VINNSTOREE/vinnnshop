@@ -27,7 +27,11 @@ module.exports = async (req, res) => {
 
     const reff_id = generateReffId();
     const fee = 597;
-    const total = parseInt(nominal) + fee;
+    const total = parseInt(nominal);
+    if (isNaN(total) || total <= 0) {
+      return res.status(400).json({ result: false, message: 'Nominal tidak valid.' });
+    }
+    const totalBayar = total + fee;
     const now = new Date();
     const created = now.toISOString().replace('T', ' ').split('.')[0];
     const expired = new Date(now.getTime() + 30 * 60000).toISOString().replace('T', ' ').split('.')[0];
@@ -37,9 +41,9 @@ module.exports = async (req, res) => {
       .from('deposits')
       .insert([{
         reff_id,
-        nominal: parseInt(nominal),
+        nominal: total,
         fee,
-        total_bayar: total,
+        total_bayar: totalBayar,
         status: 'Pending',
         qr_string: FIXED_QR_STRING,
         date_created: created,
@@ -48,7 +52,12 @@ module.exports = async (req, res) => {
 
     if (error) {
       console.error('❌ Supabase insert error:', error);
-      return res.status(500).json({ result: false, message: 'Gagal menyimpan data.' });
+      return res.status(500).json({ result: false, message: 'Gagal menyimpan data.', error });
+    }
+
+    if (!data || data.length === 0) {
+      console.error('❌ Insert success tapi data kosong');
+      return res.status(500).json({ result: false, message: 'Gagal menyimpan data. Data kosong.' });
     }
 
     return res.json({
