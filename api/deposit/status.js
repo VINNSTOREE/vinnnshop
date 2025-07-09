@@ -1,14 +1,10 @@
-require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const API_KEY = process.env.API_KEY;
+const API_KEY = 'VS-0d726f7dc04a6b';
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST')
+  if (req.method !== 'POST') 
     return res.status(405).json({ result: false, message: 'Method Not Allowed' });
 
   try {
@@ -20,22 +16,22 @@ module.exports = async (req, res) => {
     if (api_key !== API_KEY)
       return res.status(403).json({ result: false, message: 'API Key salah.' });
 
-    const { data, error } = await supabase
-      .from('deposits')
-      .select('*')
-      .eq('reff_id', reff_id)
-      .limit(1)
-      .single();
+    const dbPath = path.join(__dirname, '../../src/database/qrisdb.json');
+    if (!fs.existsSync(dbPath)) 
+      return res.status(404).json({ result: false, message: 'Database tidak ditemukan.' });
 
-    if (error || !data)
+    const content = fs.readFileSync(dbPath);
+    const db = JSON.parse(content);
+
+    const deposit = db.find(d => d.reff_id === reff_id);
+
+    if (!deposit)
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
 
-    return res.json({
-      result: true,
-      message: 'Deposit berhasil ditemukan.',
-      data
-    });
+    return res.json({ result: true, message: 'Deposit berhasil ditemukan.', data: deposit });
+
   } catch (err) {
+    console.error('❌ ERROR:', err.message);
     return res.status(500).json({ result: false, message: 'Server error', error: err.message });
   }
 };
