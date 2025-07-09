@@ -1,18 +1,22 @@
 {
-  "name": "qris-deposit-api",
+  "name": "vinn-deposit-api",
   "version": "1.0.0",
-  "description": "API deposit QRIS dengan MongoDB dan Express",
+  "description": "API untuk membuat deposit QRIS dengan MongoDB dan QR statis",
   "main": "index.js",
   "scripts": {
+    "dev": "vercel dev",
     "start": "node index.js"
   },
+  "keywords": [
+    "api",
+    "deposit",
+    "qris",
+    "mongodb",
+    "vercel"
+  ],
+  "author": "Vinn",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^7.3.1",
-    "body-parser": "^1.20.2"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "license": "MIT"
+    "mongoose": "^7.6.1"
+  }
 }
