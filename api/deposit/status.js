@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const API_KEY = 'VS-0d726f7dc04a6b';
 
-// Schema yang sama dengan create
+// Schema harus sama dengan yang dipakai di `create`
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -11,9 +11,11 @@ const DepositSchema = new mongoose.Schema({
   total_bayar: Number,
   status: String,
   qr_string: String,
+  qr_base64: String,
   date_created: Date,
   date_expired: Date
 });
+
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
 module.exports = async (req, res) => {
@@ -42,8 +44,11 @@ module.exports = async (req, res) => {
 
     return res.json({
       result: true,
-      message: 'Deposit berhasil ditemukan.',
-      data: deposit
+      data: {
+        reff_id: deposit.reff_id,
+        status: deposit.status,
+        nominal: deposit.nominal
+      }
     });
 
   } catch (err) {
