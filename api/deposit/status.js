@@ -1,34 +1,50 @@
-const fs = require('fs');
-const path = require('path');
+const connectDB = require('../../src/utils/mongodb');
+const mongoose = require('mongoose');
 
 const API_KEY = 'VS-0d726f7dc04a6b';
 
+// Schema yang sama dengan create
+const DepositSchema = new mongoose.Schema({
+  reff_id: { type: String, unique: true },
+  nominal: Number,
+  fee: Number,
+  total_bayar: Number,
+  status: String,
+  qr_string: String,
+  date_created: Date,
+  date_expired: Date
+});
+const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
+
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') 
+  if (req.method !== 'POST') {
     return res.status(405).json({ result: false, message: 'Method Not Allowed' });
+  }
 
   try {
     const { api_key, reff_id } = req.body;
 
-    if (!api_key || !reff_id)
+    if (!api_key || !reff_id) {
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
+    }
 
-    if (api_key !== API_KEY)
+    if (api_key !== API_KEY) {
       return res.status(403).json({ result: false, message: 'API Key salah.' });
+    }
 
-    const dbPath = path.join(__dirname, '../../src/database/qrisdb.json');
-    if (!fs.existsSync(dbPath)) 
-      return res.status(404).json({ result: false, message: 'Database tidak ditemukan.' });
+    await connectDB();
 
-    const content = fs.readFileSync(dbPath);
-    const db = JSON.parse(content);
+    const deposit = await Deposit.findOne({ reff_id });
 
-    const deposit = db.find(d => d.reff_id === reff_id);
-
-    if (!deposit)
+    if (!deposit) {
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
+    }
 
-    return res.json({ result: true, message: 'Deposit berhasil ditemukan.', data: deposit });
+    return res.json({
+      result: true,
+      message: 'Deposit berhasil ditemukan.',
+      data: deposit
+    });
 
   } catch (err) {
     console.error('❌ ERROR:', err.message);
