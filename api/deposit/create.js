@@ -1,4 +1,4 @@
-const connectDB = require('../../../src/utils/mongodb');
+const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
 
 // Pastikan schema dibuat setelah koneksi
