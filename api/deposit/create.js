@@ -1,9 +1,11 @@
 const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
 const QRCode = require('qrcode');
-const { ImageUploadService } = require('node-upload-images');
+const fs = require('fs');
+const imgbbUploader = require('imgbb-uploader'); // Ganti dari node-upload-images
 
 const API_KEY = 'VS-0d726f7dc04a6b';
+const IMGBB_API_KEY = 'ISI_API_KEY_IMGBB_KAMU'; // Ganti ini dengan API key asli dari imgbb
 
 // Definisi schema deposit
 const DepositSchema = new mongoose.Schema({
@@ -12,13 +14,13 @@ const DepositSchema = new mongoose.Schema({
   fee: Number,
   total_bayar: Number,
   status: String,
-  qr_string: String,    // URL gambar QR code
+  qr_string: String, // URL gambar QR
   date_created: Date,
   date_expired: Date
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-// Fungsi generate CRC16 (bisa kamu sesuaikan sesuai kebutuhan QRIS-mu)
+// Fungsi CRC16
 function convertCRC16(str) {
   let crc = 0xFFFF;
   for (let c = 0; c < str.length; c++) {
@@ -30,7 +32,7 @@ function convertCRC16(str) {
   return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
-// Fungsi generate QRIS string dinamis
+// QRIS dinamis generator
 function generateQRISString(baseQRIS, nominal) {
   let qrisData = baseQRIS.slice(0, -4);
   const step1 = qrisData.replace("010211", "010212");
@@ -44,14 +46,19 @@ function generateQRISString(baseQRIS, nominal) {
   return result;
 }
 
-async function uploadQRToPixhost(qrString) {
-  // Generate buffer QR Code dari string QRIS
+// Upload QR ke imgbb
+async function uploadQRToImgbb(qrString) {
+  const tempPath = './temp-qr.png';
   const buffer = await QRCode.toBuffer(qrString);
+  fs.writeFileSync(tempPath, buffer);
 
-  // Upload ke pixhost
-  const service = new ImageUploadService('pixhost.to');
-  const { directLink } = await service.uploadFromBinary(buffer, 'qris.png');
-  return directLink;
+  const upload = await imgbbUploader({
+    apiKey: IMGBB_API_KEY,
+    imagePath: tempPath
+  });
+
+  fs.unlinkSync(tempPath); // Hapus setelah upload
+  return upload.url;
 }
 
 module.exports = async (req, res) => {
@@ -71,27 +78,20 @@ module.exports = async (req, res) => {
     const now = new Date();
     const expired = new Date(now.getTime() + 30 * 60000); // 30 menit
 
-    // Cek duplikat transaksi
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
 
-    // Base QRIS string tetap kamu pakai
     const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
-
-    // Generate string QRIS dinamis dengan nominal
     const qrString = generateQRISString(BASE_QRIS, nominal);
+    const qrUrl = await uploadQRToImgbb(qrString);
 
-    // Upload QR code hasil generate ke pixhost dan dapatkan URL
-    const qrUrl = await uploadQRToPixhost(qrString);
-
-    // Simpan ke DB
     const deposit = new Deposit({
       reff_id: idTransaksi,
       nominal: parseInt(nominal),
       fee,
       total_bayar: total,
       status: 'Pending',
-      qr_string: qrUrl,     // simpan URL gambar QR code
+      qr_string: qrUrl,
       date_created: now,
       date_expired: expired
     });
