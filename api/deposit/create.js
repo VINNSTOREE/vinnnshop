@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Supabase credentials hardcoded (sesuaikan dengan milikmu)
+// Hardcoded Supabase credentials (ganti dengan milikmu)
 const supabaseUrl = 'https://sxuqvxdxyqltcalnpdbz.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4dXF2eGR4eXFsdGNhbG5wZGJ6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjAwMzEwMywiZXhwIjoyMDY3NTc5MTAzfQ.m_Z-RYkRrMHtlcuQ8-ofDb8QxGalPtBA1tkY2jN8eyo';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -9,47 +9,39 @@ const API_KEY = 'VS-0d726f7dc04a6b';
 const FIXED_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST')
+  if (req.method !== 'POST') {
     return res.status(405).json({ result: false, message: 'Method Not Allowed' });
+  }
 
   try {
     const { api_key, nominal } = req.body;
 
-    if (!api_key || !nominal)
+    if (!api_key || !nominal) {
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
+    }
 
-    if (api_key !== API_KEY)
+    if (api_key !== API_KEY) {
       return res.status(403).json({ result: false, message: 'API Key salah.' });
+    }
 
-    // Generate reff_id unik berdasarkan timestamp
-    const reff_id = 'VS' + Date.now();
+    // Buat reff_id unik tiap request
+    const reff_id = `VS${Math.floor(Math.random() * 1000000)}`;
 
     const fee = 597;
-    const total = parseInt(nominal) + fee;
+    const total = parseInt(nominal);
+    const total_bayar = total + fee;
     const now = new Date();
     const created = now.toISOString().replace('T', ' ').split('.')[0];
     const expired = new Date(now.getTime() + 30 * 60000).toISOString().replace('T', ' ').split('.')[0];
 
-    // Debug: Log data yang akan dimasukkan
-    console.log('Menyimpan deposit dengan data:', {
-      reff_id,
-      nominal: parseInt(nominal),
-      fee,
-      total_bayar: total,
-      status: 'Pending',
-      qr_string: FIXED_QR_STRING,
-      date_created: created,
-      date_expired: expired
-    });
-
-    // Simpan ke Supabase
+    // Insert data ke Supabase
     const { data, error } = await supabase
       .from('deposits')
       .insert([{
         reff_id,
-        nominal: parseInt(nominal),
+        nominal: total,
         fee,
-        total_bayar: total,
+        total_bayar,
         status: 'Pending',
         qr_string: FIXED_QR_STRING,
         date_created: created,
@@ -57,12 +49,12 @@ module.exports = async (req, res) => {
       }]);
 
     if (error) {
-      console.error('❌ Supabase insert error:', error);
+      console.error('Supabase insert error:', error);
       return res.status(500).json({ result: false, message: 'Gagal menyimpan data.', error });
     }
 
     if (!data || data.length === 0) {
-      console.error('❌ Data kosong dari insert Supabase:', data);
+      console.error('Insert data kosong:', data);
       return res.status(500).json({ result: false, message: 'Gagal menyimpan data. Data kosong.' });
     }
 
@@ -73,7 +65,7 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Server error:', err.message);
+    console.error('Server error:', err);
     return res.status(500).json({ result: false, message: 'Server error', error: err.message });
   }
 };
