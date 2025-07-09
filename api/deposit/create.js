@@ -32,7 +32,7 @@ function convertCRC16(str) {
   return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
-// QRIS string dinamis
+// QRIS string dinamis, pakai kode QR mu:
 function generateQRISString(baseQRIS, nominal) {
   let qrisData = baseQRIS.slice(0, -4);
   const step1 = qrisData.replace("010211", "010212");
@@ -54,8 +54,6 @@ async function uploadQRToCatbox(buffer) {
     filename: 'qris.png',
     contentType: 'image/png'
   });
-  // Kalau punya userhash, tambahkan ini:
-  // form.append('userhash', 'YOUR_USER_HASH_HERE');
 
   const response = await axios.post('https://catbox.moe/user/api.php', form, {
     headers: form.getHeaders()
@@ -92,7 +90,7 @@ module.exports = async (req, res) => {
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
 
-    const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A0163040DB5';
+    const BASE_QRIS = "00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A0163040DB5";
 
     const qrString = generateQRISString(BASE_QRIS, nominal);
     const qrBuffer = await QRCode.toBuffer(qrString);
