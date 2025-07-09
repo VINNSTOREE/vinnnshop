@@ -14,8 +14,7 @@ const DepositSchema = new mongoose.Schema({
   fee: Number,
   total_bayar: Number,
   status: String,
-  qr_string: String,      // URL gambar QR code
-  qr_base64: String,      // optional, base64 QR code image
+  qr_string: String, // URL gambar QR code
   date_created: Date,
   date_expired: Date
 });
@@ -47,36 +46,26 @@ function generateQRISString(baseQRIS, nominal) {
   return result;
 }
 
-// Upload QR buffer ke Pixhost
-async function uploadQRToPixhost(buffer) {
+// Upload QR buffer ke catbox.moe
+async function uploadQRToCatbox(buffer) {
   const form = new FormData();
-  form.append('img', buffer, {
+  form.append('reqtype', 'fileupload');
+  form.append('fileToUpload', buffer, {
     filename: 'qris.png',
     contentType: 'image/png'
   });
-  form.append('content_type', '1');
-  form.append('action', 'upload');
+  // Kalau punya userhash, tambahkan ini:
+  // form.append('userhash', 'YOUR_USER_HASH_HERE');
 
-  const response = await axios.post('https://pixhost.to/upload-api.php', form, {
+  const response = await axios.post('https://catbox.moe/user/api.php', form, {
     headers: form.getHeaders()
   });
 
-  const match = response.data.match(/https:\/\/img\d+\.pixhost\.to\/images\/\d+\/[^"]+/);
-  if (!match) throw new Error('Gagal parsing link gambar.');
-
-  return match[0];
-}
-
-// Generate QR code base64 tanpa upload
-async function generateQRBase64(qrString) {
-  try {
-    const base64Data = await QRCode.toDataURL(qrString);
-    // base64Data format: data:image/png;base64,xxxxxx
-    return base64Data;
-  } catch (error) {
-    console.error('Error generating QR base64:', error);
-    throw error;
+  if (!response.data.startsWith('https://')) {
+    throw new Error('Upload gagal: ' + response.data);
   }
+
+  return response.data; // URL file uploaded
 }
 
 // Handler utama
@@ -103,21 +92,11 @@ module.exports = async (req, res) => {
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
 
-    const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VIN GANS6008SIDOARJO61056121262070703A0163040DB5';
+    const BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A0163040DB5';
 
     const qrString = generateQRISString(BASE_QRIS, nominal);
-
-    // Generate QR buffer and upload to pixhost
     const qrBuffer = await QRCode.toBuffer(qrString);
-    let qrUrl = null;
-    try {
-      qrUrl = await uploadQRToPixhost(qrBuffer);
-    } catch (e) {
-      console.warn('Upload QR ke pixhost gagal, lanjut tanpa upload:', e.message);
-    }
-
-    // Generate base64 sebagai fallback atau tambahan
-    const qrBase64 = await generateQRBase64(qrString);
+    const qrUrl = await uploadQRToCatbox(qrBuffer);
 
     const deposit = new Deposit({
       reff_id: idTransaksi,
@@ -125,8 +104,7 @@ module.exports = async (req, res) => {
       fee,
       total_bayar: total,
       status: 'Pending',
-      qr_string: qrUrl || '',   // kalau upload gagal, kosongkan
-      qr_base64: qrBase64,      // selalu simpan base64
+      qr_string: qrUrl,
       date_created: now,
       date_expired: expired
     });
