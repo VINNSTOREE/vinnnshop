@@ -1,7 +1,7 @@
 {
   "name": "my-deposit-api",
   "version": "1.0.0",
-  "description": "API deposit dengan QRIS dinamis dan upload gambar QR code",
+  "description": "API deposit dengan QRIS dinamis dan upload QR ke imgbb",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -21,7 +21,7 @@
     "express": "^4.18.2",
     "form-data": "^4.0.0",
     "mongoose": "^7.6.1",
-    "node-upload-images": "^1.0.6",
+    "imgbb-uploader": "^1.3.0",
     "qrcode": "^1.5.1"
   },
   "engines": {
