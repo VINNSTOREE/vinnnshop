@@ -3,10 +3,9 @@ const mongoose = require('mongoose');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const FormData = require('form-data');
-const config = require('../../config');
-// API Key
+
+// API key
 const API_KEY = 'VS-0d726f7dc04a6b';
-const BASE_QRIS = config.BASE_QRIS;
 
 // Schema MongoDB
 const DepositSchema = new mongoose.Schema({
@@ -15,13 +14,13 @@ const DepositSchema = new mongoose.Schema({
   fee: Number,
   total_bayar: Number,
   status: String,
-  qr_string: String,
+  qr_string: String, // URL gambar QR code
   date_created: Date,
   date_expired: Date
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-// CRC-16 QRIS
+// QRIS CRC-16 calculation
 function convertCRC16(str) {
   let crc = 0xFFFF;
   for (let c = 0; c < str.length; c++) {
@@ -33,9 +32,9 @@ function convertCRC16(str) {
   return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
-// Generate QR String
+// Generate QRIS string with dynamic nominal
 function generateQRISString(baseQRIS, nominal) {
-  const qrisData = baseQRIS.slice(0, -4);
+  let qrisData = baseQRIS.slice(0, -4);
   const step1 = qrisData.replace("010211", "010212");
   const step2 = step1.split("5802ID");
 
@@ -43,12 +42,11 @@ function generateQRISString(baseQRIS, nominal) {
   let uang = "54" + ("0" + nominal.length).slice(-2) + nominal;
   uang += "5802ID";
 
-  const fullString = step2[0] + uang + step2[1];
-  const crc = convertCRC16(fullString);
-  return fullString + crc;
+  const result = step2[0] + uang + step2[1] + convertCRC16(step2[0] + uang + step2[1]);
+  return result;
 }
 
-// Upload QR ke Catbox
+// Upload QR buffer ke catbox.moe
 async function uploadQRToCatbox(buffer) {
   const form = new FormData();
   form.append('reqtype', 'fileupload');
@@ -56,6 +54,8 @@ async function uploadQRToCatbox(buffer) {
     filename: 'qris.png',
     contentType: 'image/png'
   });
+  // Jika ada userhash, bisa ditambahkan di sini:
+  // form.append('userhash', 'YOUR_USER_HASH_HERE');
 
   const response = await axios.post('https://catbox.moe/user/api.php', form, {
     headers: form.getHeaders()
@@ -65,10 +65,10 @@ async function uploadQRToCatbox(buffer) {
     throw new Error('Upload gagal: ' + response.data);
   }
 
-  return response.data;
+  return response.data; // URL gambar QR yang diupload
 }
 
-// Handler utama
+// Handler utama API create deposit
 module.exports = async (req, res) => {
   if (req.method !== 'POST')
     return res.status(405).json({ result: false, message: 'Method Not Allowed' });
@@ -83,14 +83,16 @@ module.exports = async (req, res) => {
 
     await connectDB();
 
-    const idTransaksi = reff_id || 'VINNPG' + Math.floor(100000 + Math.random() * 900000);
+    const idTransaksi = reff_id || 'VINNPG-' + Math.floor(100000 + Math.random() * 900000);
     const fee = 597;
     const total = parseInt(nominal) + fee;
     const now = new Date();
-    const expired = new Date(now.getTime() + 30 * 60000);
+    const expired = new Date(now.getTime() + 30 * 60000); // 30 menit
 
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
+
+    const BASE_QRIS = '00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A0163040DB5';
 
     const qrString = generateQRISString(BASE_QRIS, nominal);
     const qrBuffer = await QRCode.toBuffer(qrString);
