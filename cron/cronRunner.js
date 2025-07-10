@@ -1,7 +1,9 @@
-const cron = require('node-cron');
-const cekMutasi = require('../api/Deposit/mutasi');
+const cekMutasi = require('./api/Deposit/mutasi');
 
-cron.schedule('*/1 * * * *', () => {
-  console.log('Jalankan mutasi cek status deposit setiap menit');
-  cekMutasi();
-});
+async function run() {
+  console.log('Mulai cek mutasi...');
+  await cekMutasi();
+  console.log('Selesai cek mutasi.');
+}
+
+run();
