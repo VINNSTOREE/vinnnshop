@@ -84,7 +84,7 @@ module.exports = async (req, res) => {
 
     await connectDB();
 
-    const idTransaksi = reff_id || 'VS' + Math.floor(100000 + Math.random() * 900000);
+    const idTransaksi = reff_id || 'VINNPG' + Math.floor(100000 + Math.random() * 900000);
     const fee = 597;
     const total = parseInt(nominal) + fee;
     const now = new Date();
