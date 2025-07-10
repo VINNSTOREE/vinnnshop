@@ -1,9 +1,9 @@
 const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
+const axios = require('axios');
 
 const API_KEY = 'VS-0d726f7dc04a6b';
 
-// Schema harus sama dengan yang dipakai di `create`
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -15,7 +15,6 @@ const DepositSchema = new mongoose.Schema({
   date_created: Date,
   date_expired: Date
 });
-
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
 module.exports = async (req, res) => {
@@ -35,11 +34,30 @@ module.exports = async (req, res) => {
     }
 
     await connectDB();
-
     const deposit = await Deposit.findOne({ reff_id });
-
     if (!deposit) {
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
+    }
+
+    // cek ke API eksternal (qrisdinamis)
+    let apiStatus;
+    try {
+      const statusRes = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
+        api_key: API_KEY,
+        reff_id: reff_id
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      apiStatus = statusRes.data;
+    } catch (err) {
+      console.error('❌ Gagal konek ke API status eksternal:', err.message);
+      return res.status(500).json({ result: false, message: 'Gagal konek ke API eksternal.' });
+    }
+
+    if (apiStatus?.result && apiStatus.data?.status === 'Success' && deposit.status !== 'Success') {
+      deposit.status = 'Success';
+      await deposit.save();
     }
 
     return res.json({
