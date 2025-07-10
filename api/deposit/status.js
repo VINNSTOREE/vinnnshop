@@ -4,6 +4,7 @@ const axios = require('axios');
 
 const API_KEY = 'VS-0d726f7dc04a6b';
 
+// Schema harus sama dengan create
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -11,7 +12,6 @@ const DepositSchema = new mongoose.Schema({
   total_bayar: Number,
   status: String,
   qr_string: String,
-  qr_base64: String,
   date_created: Date,
   date_expired: Date
 });
@@ -24,7 +24,6 @@ module.exports = async (req, res) => {
 
   try {
     const { api_key, reff_id } = req.body;
-
     if (!api_key || !reff_id) {
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
     }
@@ -34,43 +33,48 @@ module.exports = async (req, res) => {
     }
 
     await connectDB();
+
+    // Cari data deposit di database
     const deposit = await Deposit.findOne({ reff_id });
     if (!deposit) {
       return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
     }
 
-    // cek ke API eksternal (qrisdinamis)
-    let apiStatus;
+    // Panggil API eksternal untuk cek status pembayaran sebenarnya
     try {
-      const statusRes = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
-        api_key: API_KEY,
-        reff_id: reff_id
-      }, {
-        headers: { 'Content-Type': 'application/json' }
+      const externalRes = await axios.post('https://external-api-url.com/check-status', {
+        api_key: 'external_api_key',
+        reff_id
+      }, { timeout: 10000 });
+
+      if (!externalRes.data || !externalRes.data.result) {
+        return res.status(500).json({ result: false, message: 'Gagal mendapatkan data dari API eksternal.' });
+      }
+
+      // Update status di DB jika perlu
+      const newStatus = externalRes.data.data.status;
+      if (deposit.status !== newStatus) {
+        deposit.status = newStatus;
+        await deposit.save();
+      }
+
+      // Balikkan hasil ke client
+      return res.json({
+        result: true,
+        message: 'Status deposit berhasil diperbarui.',
+        data: {
+          reff_id: deposit.reff_id,
+          status: deposit.status,
+          nominal: deposit.nominal
+        }
       });
 
-      apiStatus = statusRes.data;
     } catch (err) {
-      console.error('❌ Gagal konek ke API status eksternal:', err.message);
+      console.error('❌ ERROR koneksi API eksternal:', err.message);
       return res.status(500).json({ result: false, message: 'Gagal konek ke API eksternal.' });
     }
-
-    if (apiStatus?.result && apiStatus.data?.status === 'Success' && deposit.status !== 'Success') {
-      deposit.status = 'Success';
-      await deposit.save();
-    }
-
-    return res.json({
-      result: true,
-      data: {
-        reff_id: deposit.reff_id,
-        status: deposit.status,
-        nominal: deposit.nominal
-      }
-    });
-
   } catch (err) {
-    console.error('❌ ERROR:', err.message);
+    console.error('❌ ERROR server:', err.message);
     return res.status(500).json({ result: false, message: 'Server error', error: err.message });
   }
 };
