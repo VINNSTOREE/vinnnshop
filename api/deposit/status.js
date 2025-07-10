@@ -26,7 +26,7 @@ async function cekMutasi() {
     }
     for (const dep of deposits) {
       try {
-        const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/Deposit/status', {
+        const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
           api_key: API_KEY,
           reff_id: dep.reff_id
         }, { timeout: 10000 });
