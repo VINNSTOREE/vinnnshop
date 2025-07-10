@@ -1,7 +1,8 @@
-const connectDB = require('../../utils/mongodb');
+const connectDB = require('../../../src/utils/mongodb'); // sesuaikan path ini
 const mongoose = require('mongoose');
 const axios = require('axios');
 
+// Schema Deposit (sama dengan create)
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -14,34 +15,42 @@ const DepositSchema = new mongoose.Schema({
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-const API_KEY = 'VS-0d726f7dc04a6b';
+// Data merchant dan API key OkeConnect kamu
+const MERCHANT_CODE = 'OK471136';
+const API_KEY = '18886951732359736471136OKCT1B836983290190CF25B2FEFFFD650D74';
 
-async function cekMutasi() {
+async function cekMutasiOkeConnect() {
   await connectDB();
 
+  // Cari semua deposit dengan status Pending
   const deposits = await Deposit.find({ status: 'Pending' });
 
   for (const deposit of deposits) {
     try {
-      const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
+      const response = await axios.post('https://www.okeconnect.com/integrasi/payment_gateway/api.php', {
+        merchant_code: MERCHANT_CODE,
         api_key: API_KEY,
         reff_id: deposit.reff_id
       });
 
       const result = response.data;
-      console.log(`[🔁] Cek: ${deposit.reff_id} | Status: ${result.message || result.status}`);
 
-      if (result.result && result.data.status.toLowerCase() === 'success') {
+      console.log(`[🔁] Cek: ${deposit.reff_id} | Status: ${result.status}`);
+
+      // Jika status sukses, update di DB
+      if (result.status && result.status.toLowerCase() === 'success') {
         deposit.status = 'Success';
         await deposit.save();
+
         console.log(`[✅] Pembayaran terverifikasi: ${deposit.reff_id} | Nominal: ${deposit.nominal}`);
-        // Kirim notif ke WA user atau owner bisa ditambahkan di sini
+
+        // TODO: Tambahkan notifikasi WA ke user atau owner jika perlu
       }
+
     } catch (err) {
       console.error(`❌ Gagal cek ${deposit.reff_id}: ${err.message}`);
     }
   }
 }
 
-// Bisa kamu panggil dari cron job
-cekMutasi();
+module.exports = cekMutasiOkeConnect;
