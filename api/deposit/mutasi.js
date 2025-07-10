@@ -21,37 +21,40 @@ async function cekMutasi() {
 
   const deposits = await Deposit.find({ status: 'Pending' });
 
-  console.log(`[Mutasi] Cek ${deposits.length} transaksi pending...`);
+  if (deposits.length === 0) {
+    console.log('[Mutasi] Tidak ada transaksi pending.');
+    return;
+  }
+
+  console.log(`[Mutasi] Memeriksa ${deposits.length} transaksi pending...`);
 
   for (const deposit of deposits) {
     try {
-      // Cek status ke API eksternal
-      const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
-        api_key: API_KEY,
-        reff_id: deposit.reff_id
-      }, { timeout: 10000 }); // timeout 10 detik
+      const response = await axios.post(
+        'https://qrisdinamis.api.vinnn.tech/api/deposit/status',
+        {
+          api_key: API_KEY,
+          reff_id: deposit.reff_id
+        },
+        { timeout: 10000 }
+      );
 
-      const data = response.data;
+      const { data } = response;
 
-      if (data.result && data.data && data.data.status === 'Success') {
+      if (data.result && data.data?.status === 'Success') {
         deposit.status = 'Success';
         await deposit.save();
 
-        console.log(`[✅] Deposit sukses: ${deposit.reff_id} | Nominal: ${deposit.nominal}`);
-
-      } else if (data.result && data.data && data.data.status === 'Pending') {
-        console.log(`[ℹ️] Deposit masih pending: ${deposit.reff_id}`);
+        console.log(`[✅] Transaksi sukses: ${deposit.reff_id} | Rp${deposit.nominal.toLocaleString('id-ID')}`);
+      } else if (data.result && data.data?.status === 'Pending') {
+        console.log(`[🕐] Masih pending: ${deposit.reff_id}`);
       } else {
-        console.log(`[⚠️] Status tidak dikenali untuk ${deposit.reff_id}:`, data);
+        console.log(`[⚠️] Status tidak dikenal (${deposit.reff_id}):`, data);
       }
 
     } catch (error) {
-      if (error.response) {
-        console.log(`[❌ Mutasi] Error cek status ${deposit.reff_id}: Status code ${error.response.status}`);
-      } else {
-        console.log(`[❌ Mutasi] Error cek status ${deposit.reff_id}:`, error.message);
-      }
-      // jangan throw supaya mutasi lanjut ke deposit berikutnya
+      const status = error.response?.status || 'Tidak diketahui';
+      console.log(`[❌] Gagal cek ${deposit.reff_id} | Status: ${status} | Error: ${error.message}`);
     }
   }
 }
