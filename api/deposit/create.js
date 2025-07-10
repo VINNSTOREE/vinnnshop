@@ -3,10 +3,11 @@ const mongoose = require('mongoose');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const FormData = require('form-data');
+const config = require('../../src/utils/config');
 
-// Konstanta
+// API Key
 const API_KEY = 'VS-0d726f7dc04a6b';
-const BASE_QRIS = '00020101021226670016COM.NOBUBANK.WWW01189360050300000879140214249245531475870303UMI51440014ID.CO.QRIS.WWW0215ID20222128523070303UMI5204481453033605802ID5908VINGANS6008SIDOARJO61056121262070703A01630';
+const BASE_QRIS = config.BASE_QRIS;
 
 // Schema MongoDB
 const DepositSchema = new mongoose.Schema({
@@ -21,33 +22,34 @@ const DepositSchema = new mongoose.Schema({
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-// Fungsi CRC16
+// CRC-16 QRIS
 function convertCRC16(str) {
   let crc = 0xFFFF;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = (crc << 1) ^ 0x1021;
-      } else {
-        crc <<= 1;
-      }
+  for (let c = 0; c < str.length; c++) {
+    crc ^= str.charCodeAt(c) << 8;
+    for (let i = 0; i < 8; i++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
     }
-    crc &= 0xFFFF;
   }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
+  return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
-// Fungsi QRIS builder dengan nominal dan CRC
+// Generate QR String
 function generateQRISString(baseQRIS, nominal) {
-  const nominalStr = nominal.toString();
-  const id54 = `54${("0" + nominalStr.length).slice(-2)}${nominalStr}`;
-  const fullWithoutCRC = baseQRIS + id54 + '6304';
-  const crc = convertCRC16(fullWithoutCRC);
-  return fullWithoutCRC + crc;
+  const qrisData = baseQRIS.slice(0, -4);
+  const step1 = qrisData.replace("010211", "010212");
+  const step2 = step1.split("5802ID");
+
+  nominal = nominal.toString();
+  let uang = "54" + ("0" + nominal.length).slice(-2) + nominal;
+  uang += "5802ID";
+
+  const fullString = step2[0] + uang + step2[1];
+  const crc = convertCRC16(fullString);
+  return fullString + crc;
 }
 
-// Upload ke catbox.moe
+// Upload QR ke Catbox
 async function uploadQRToCatbox(buffer) {
   const form = new FormData();
   form.append('reqtype', 'fileupload');
@@ -74,7 +76,6 @@ module.exports = async (req, res) => {
 
   try {
     const { api_key, nominal, reff_id } = req.body;
-
     if (!api_key || !nominal)
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
 
@@ -87,7 +88,7 @@ module.exports = async (req, res) => {
     const fee = 597;
     const total = parseInt(nominal) + fee;
     const now = new Date();
-    const expired = new Date(now.getTime() + 30 * 60000); // 30 menit
+    const expired = new Date(now.getTime() + 30 * 60000);
 
     const exist = await Deposit.findOne({ reff_id: idTransaksi });
     if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
