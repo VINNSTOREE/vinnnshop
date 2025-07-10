@@ -5,11 +5,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { API_KEY, BASE_QRIS } = require('../../config');
 
-// Schema Deposit
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
-  fee: Number,
   total_bayar: Number,
   status: String,
   qr_string: String,
@@ -18,17 +16,6 @@ const DepositSchema = new mongoose.Schema({
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-// Fungsi generate reff_id random dengan awalan VINNPG-
-function generateReffId() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let randomPart = '';
-  for (let i = 0; i < 6; i++) {
-    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `VINNPG-${randomPart}`;
-}
-
-// CRC16 calculation untuk QRIS
 function convertCRC16(str) {
   let crc = 0xFFFF;
   for (let c = 0; c < str.length; c++) {
@@ -40,7 +27,6 @@ function convertCRC16(str) {
   return ("000" + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
-// Generate QRIS string dengan nominal dinamis
 function generateQRISString(baseQRIS, nominal) {
   let qrisData = baseQRIS.slice(0, -4);
   const step1 = qrisData.replace("010211", "010212");
@@ -54,7 +40,6 @@ function generateQRISString(baseQRIS, nominal) {
   return result;
 }
 
-// Upload QR code buffer ke catbox.moe
 async function uploadQRToCatbox(buffer) {
   const form = new FormData();
   form.append('reqtype', 'fileupload');
@@ -80,7 +65,6 @@ module.exports = async (req, res) => {
 
   try {
     const { api_key, nominal, reff_id } = req.body;
-
     if (!api_key || !nominal)
       return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
 
@@ -89,31 +73,21 @@ module.exports = async (req, res) => {
 
     await connectDB();
 
-    // Gunakan reff_id dari request atau generate baru
-    const idTransaksi = reff_id || generateReffId();
-
-    const fee = 597;
-    const nominalNum = Number(nominal);
-    const total = nominalNum + fee;
-
-    // Cek duplikat reff_id
-    const exist = await Deposit.findOne({ reff_id: idTransaksi });
-    if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
-
-    // Generate QRIS string dinamis
-    const qrString = generateQRISString(BASE_QRIS, nominalNum);
-    const qrBuffer = await QRCode.toBuffer(qrString);
-
-    // Upload QR ke catbox
-    const qrUrl = await uploadQRToCatbox(qrBuffer);
-
+    const idTransaksi = reff_id || 'VINNPG-' + Math.floor(100000 + Math.random() * 900000);
+    const total = parseInt(nominal); // total = nominal (tanpa fee)
     const now = new Date();
     const expired = new Date(now.getTime() + 30 * 60000); // 30 menit
 
+    const exist = await Deposit.findOne({ reff_id: idTransaksi });
+    if (exist) return res.status(409).json({ result: false, message: 'reff_id sudah ada.' });
+
+    const qrString = generateQRISString(BASE_QRIS, nominal);
+    const qrBuffer = await QRCode.toBuffer(qrString);
+    const qrUrl = await uploadQRToCatbox(qrBuffer);
+
     const deposit = new Deposit({
       reff_id: idTransaksi,
-      nominal: nominalNum,
-      fee,
+      nominal: parseInt(nominal),
       total_bayar: total,
       status: 'Pending',
       qr_string: qrUrl,
