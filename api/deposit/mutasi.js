@@ -1,8 +1,7 @@
-const connectDB = require('../../../src/utils/mongodb'); // sesuaikan path ini
+const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
-// Schema Deposit (sama dengan create)
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
@@ -11,46 +10,45 @@ const DepositSchema = new mongoose.Schema({
   status: String,
   qr_string: String,
   date_created: Date,
-  date_expired: Date
+  date_expired: Date,
+  user_jid: String // simpan nomor WA user untuk notif
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-// Data merchant dan API key OkeConnect kamu
-const MERCHANT_CODE = 'OK471136';
-const API_KEY = '18886951732359736471136OKCT1B836983290190CF25B2FEFFFD650D74';
+const API_KEY = 'VS-0d726f7dc04a6b';
 
-async function cekMutasiOkeConnect() {
+async function cekMutasi(yilzi) {
   await connectDB();
 
-  // Cari semua deposit dengan status Pending
-  const deposits = await Deposit.find({ status: 'Pending' });
+  const pendingDeposits = await Deposit.find({ status: 'Pending' });
 
-  for (const deposit of deposits) {
+  for (const dep of pendingDeposits) {
     try {
-      const response = await axios.post('https://www.okeconnect.com/integrasi/payment_gateway/api.php', {
-        merchant_code: MERCHANT_CODE,
+      const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
         api_key: API_KEY,
-        reff_id: deposit.reff_id
+        reff_id: dep.reff_id
       });
 
-      const result = response.data;
+      const data = response.data;
 
-      console.log(`[🔁] Cek: ${deposit.reff_id} | Status: ${result.status}`);
+      if (data.result && data.data.status === 'Success') {
+        dep.status = 'Success';
+        await dep.save();
 
-      // Jika status sukses, update di DB
-      if (result.status && result.status.toLowerCase() === 'success') {
-        deposit.status = 'Success';
-        await deposit.save();
+        console.log(`[✅] Deposit terverifikasi: ${dep.reff_id}`);
 
-        console.log(`[✅] Pembayaran terverifikasi: ${deposit.reff_id} | Nominal: ${deposit.nominal}`);
-
-        // TODO: Tambahkan notifikasi WA ke user atau owner jika perlu
+        if (dep.user_jid) {
+          await yilzi.sendMessage(dep.user_jid, {
+            text: `🎉 Deposit kamu sudah terkonfirmasi!\nID: ${dep.reff_id}\nNominal: Rp${dep.nominal.toLocaleString('id-ID')}`
+          });
+        }
+      } else {
+        console.log(`[ℹ️] Deposit ${dep.reff_id} status: ${data.message || data.data.status}`);
       }
-
     } catch (err) {
-      console.error(`❌ Gagal cek ${deposit.reff_id}: ${err.message}`);
+      console.error(`❌ Gagal cek deposit ${dep.reff_id}:`, err.message);
     }
   }
 }
 
-module.exports = cekMutasiOkeConnect;
+module.exports = cekMutasi;
