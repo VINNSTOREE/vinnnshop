@@ -1,6 +1,6 @@
 const connectDB = require('../../src/utils/mongodb');
 const mongoose = require('mongoose');
-const axios = require('axios');
+const API_KEY = 'VS-0d726f7dc04a6b';
 
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
@@ -14,38 +14,40 @@ const DepositSchema = new mongoose.Schema({
 });
 const Deposit = mongoose.models.Deposit || mongoose.model('Deposit', DepositSchema);
 
-const API_KEY = 'VS-0d726f7dc04a6b';
+module.exports = async (req, res) => {
+  if (req.method !== 'POST')
+    return res.status(405).json({ result: false, message: 'Method Not Allowed' });
 
-async function cekMutasi() {
   try {
+    const { api_key, reff_id } = req.body;
+
+    if (!api_key || !reff_id)
+      return res.status(400).json({ result: false, message: 'Parameter tidak lengkap.' });
+
+    if (api_key !== API_KEY)
+      return res.status(403).json({ result: false, message: 'API Key salah.' });
+
     await connectDB();
-    const deposits = await Deposit.find({ status: 'Pending' });
-    if (!deposits.length) {
-      console.log('[Mutasi] Tidak ada deposit Pending');
-      return;
-    }
-    for (const dep of deposits) {
-      try {
-        const response = await axios.post('https://qrisdinamis.api.vinnn.tech/api/deposit/status', {
-          api_key: API_KEY,
-          reff_id: dep.reff_id
-        }, { timeout: 10000 });
 
-        const res = response.data;
-        console.log(`[Mutasi] Cek ${dep.reff_id} status: ${res.status || res.message || 'No status'}`);
+    const deposit = await Deposit.findOne({ reff_id });
 
-        if (res.result && res.data && res.data.status === 'Success') {
-          dep.status = 'Success';
-          await dep.save();
-          console.log(`[Mutasi] Deposit berhasil diupdate jadi Success: ${dep.reff_id}`);
-        }
-      } catch (e) {
-        console.error(`[Mutasi] Error cek status ${dep.reff_id}:`, e.message);
+    if (!deposit)
+      return res.status(404).json({ result: false, message: 'Deposit tidak ditemukan.' });
+
+    return res.json({
+      result: true,
+      data: {
+        reff_id: deposit.reff_id,
+        status: deposit.status,
+        nominal: deposit.nominal,
+        fee: deposit.fee,
+        total_bayar: deposit.total_bayar,
+        date_created: deposit.date_created,
+        date_expired: deposit.date_expired
       }
-    }
+    });
   } catch (err) {
-    console.error('[Mutasi] Error:', err.message);
+    console.error('❌ ERROR:', err.message);
+    return res.status(500).json({ result: false, message: 'Server error', error: err.message });
   }
-}
-
-module.exports = cekMutasi;
+};
