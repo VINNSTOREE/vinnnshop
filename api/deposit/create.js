@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const FormData = require('form-data');
-const config = require('../../src/utils/config');
-
+const config = require('../../config');
 // API Key
 const API_KEY = 'VS-0d726f7dc04a6b';
 const BASE_QRIS = config.BASE_QRIS;
