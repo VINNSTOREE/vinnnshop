@@ -5,7 +5,6 @@ const API_KEY = 'VS-0d726f7dc04a6b';
 const DepositSchema = new mongoose.Schema({
   reff_id: { type: String, unique: true },
   nominal: Number,
-  fee: Number,
   total_bayar: Number,
   status: String,
   qr_string: String,
@@ -40,7 +39,6 @@ module.exports = async (req, res) => {
         reff_id: deposit.reff_id,
         status: deposit.status,
         nominal: deposit.nominal,
-        fee: deposit.fee,
         total_bayar: deposit.total_bayar,
         date_created: deposit.date_created,
         date_expired: deposit.date_expired
